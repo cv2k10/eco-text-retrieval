@@ -1,0 +1,5 @@
+- [ ] persist uploaded file
+- [ ] use page for different extracted articles
+- [ ] add search functionality
+- [ ] create chatgpt.com?q=article link 
+- [ ] add uploaded file list page
