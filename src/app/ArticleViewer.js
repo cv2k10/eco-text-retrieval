@@ -200,6 +200,17 @@ const ArticleViewer = () => {
                         >
                             Copy to Clipboard
                         </button>
+
+                        <button
+                            onClick={() => {
+                                const articleText = `${selectedArticle.title}\n\n${selectedArticle.content}`;
+                                const encodedText = encodeURIComponent(articleText);
+                                window.open(`https://chatgpt.com?q=${encodedText}`, '_blank');
+                            }}
+                            className="bg-green-600 hover:bg-green-700 text-white py-1 px-3 rounded flex items-center"
+                        >
+                            Send to ChatGPT
+                        </button>
                     </div>
 
                     <div className="mb-4">
