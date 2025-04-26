@@ -98,11 +98,11 @@ const ArticleViewer = () => {
                 <p className="text-xs text-gray-500 mt-1">
                     The file should contain articles with headers in the format:
                     <br />
-                    &lt;Title&gt; (e.g., "The world this week")
+                    &lt;Title&gt; (e.g., \"The world this week\")
                     <br />
-                    &lt;Category&gt; (e.g., "Politics")
+                    &lt;Category&gt; (e.g., \"Politics\")
                     <br />
-                    &lt;Date&gt; (e.g., "Apr 25, 2025 02:10 AM")
+                    &lt;Date&gt; (e.g., \"Apr 25, 2025 02:10 AM\")
                 </p>
             </div>
 
