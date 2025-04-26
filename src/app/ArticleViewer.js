@@ -7,7 +7,7 @@ const ArticleViewer = () => {
     const [selectedArticle, setSelectedArticle] = useState(null);
     const [error, setError] = useState('');
 
-    const parseArticles = (text) => {
+    const parseArticles1 = (text) => {
         // Regular expression to detect article headers
         // Looks for patterns like:
         // Title: [title text]
@@ -45,7 +45,74 @@ const ArticleViewer = () => {
 
         // Extract content for the last article
         if (articles.length > 0) {
-            articles[articles.length - 1].content = text.substring(lastIndex).trim();
+            let lastArticleContent = text.substring(lastIndex).trim();
+
+            // End article content if it encounters the '■' character
+            const squareIndex = lastArticleContent.indexOf('■');
+            if (squareIndex !== -1) {
+                lastArticleContent = lastArticleContent.substring(0, squareIndex).trim();
+            }
+
+            articles[articles.length - 1].content = lastArticleContent;
+        }
+
+        return articles;
+    };
+
+    const parseArticles = (text) => {
+        // Regular expression to detect article headers
+        // Looks for patterns like:
+        // Title: [title text]
+        // Category: [category text]
+        // Date: [date text]
+        const headerRegex = /(.+?)\s*\n\s*(.+?)\s*\n\s*(.+?\d{2}:\d{2} [AP]M)/g;
+
+        let articles = [];
+        let match;
+        let lastIndex = 0;
+
+        // Find all header matches
+        while ((match = headerRegex.exec(text)) !== null) {
+            const startIndex = match.index;
+
+            // If this isn't the first match, extract the content of the previous article
+            if (lastIndex > 0) {
+                let previousArticleContent = text.substring(lastIndex, startIndex).trim();
+
+                // End article content if it encounters the '■' character
+                const squareIndex = previousArticleContent.indexOf('■');
+                if (squareIndex !== -1) {
+                    previousArticleContent = previousArticleContent.substring(0, squareIndex).trim();
+                }
+
+                if (previousArticleContent) {
+                    articles[articles.length - 1].content = previousArticleContent;
+                }
+            }
+
+            // Add the new article
+            articles.push({
+                title: match[1].trim(),
+                category: match[2].trim(),
+                date: match[3].trim(),
+                content: '',
+                startIndex: startIndex
+            });
+
+            lastIndex = startIndex + match[0].length;
+        }
+
+        // Extract content for the last article
+        if (articles.length > 0) {
+            let lastArticleContent = text.substring(lastIndex).trim();
+
+            // End article content if it encounters the '■' character
+            const squareIndex = lastArticleContent.indexOf('■');
+            if (squareIndex !== -1) {
+                lastArticleContent = lastArticleContent.substring(0, squareIndex).trim();
+            }
+
+            articles[articles.length - 1].content = lastArticleContent;
         }
 
         return articles;
@@ -124,7 +191,9 @@ const ArticleViewer = () => {
 
                         <button
                             onClick={() => {
-                                navigator.clipboard.writeText(selectedArticle.content);
+                                // navigator.clipboard.writeText(selectedArticle.content);
+                                navigator.clipboard.writeText(`${selectedArticle.title}\n\n${selectedArticle.content}`);
+
                                 alert('Article copied to clipboard!');
                             }}
                             className="bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded flex items-center"
