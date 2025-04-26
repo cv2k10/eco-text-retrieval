@@ -1,3 +1,9 @@
+Eco-Text Retrieval is a web application that processes text files created by EPUB to TXT conversion tools (like [Convertio](https://convertio.co/epub-txt/)). The application takes uploaded text content from magazine articles, separates them into individual articles, and presents them in an easily accessible format.
+
+Each article page displays the raw text of the article together with 2 buttons:
+- **Copy to Clipboard**: Copies the article content to clipboard
+- **Send to ChatGPT**: Sends the article to ChatGPT for further query and analysis
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
 ## Getting Started
