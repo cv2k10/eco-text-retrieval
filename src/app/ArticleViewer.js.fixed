@@ -401,9 +401,20 @@ const ArticleViewer = () => {
                             </button>
                         </div>
                     </div>
+
+                    <div className="mb-4">
+                        <h2 className="text-xl font-bold">{selectedArticle.title}</h2>
+                        <div className="text-sm text-gray-600 mt-1">
+                            {selectedArticle.category} | {selectedArticle.date}
+                        </div>
+                    </div>
+
+                    <div className="whitespace-pre-wrap">
+                        {selectedArticle.content}
+                    </div>
                     
-                    {/* Article navigation - moved to the top */}
-                    <div className="flex justify-between items-center my-4">
+                    {/* Article navigation */}
+                    <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-200">
                         {getNavigationStatus().hasPrevious ? (
                             <button
                                 onClick={goToPreviousArticle}
@@ -425,17 +436,6 @@ const ArticleViewer = () => {
                         ) : (
                             <div></div> /* Empty div to maintain spacing when button is not present */
                         )}
-                    </div>
-
-                    <div className="mb-4">
-                        <h2 className="text-xl font-bold">{selectedArticle.title}</h2>
-                        <div className="text-sm text-gray-600 mt-1">
-                            {selectedArticle.category} | {selectedArticle.date}
-                        </div>
-                    </div>
-
-                    <div className="whitespace-pre-wrap">
-                        {selectedArticle.content}
                     </div>
                 </div>
             ) : (
