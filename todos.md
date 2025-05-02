@@ -1,5 +1,9 @@
 - [ ] persist uploaded file
 - [ ] use page for different extracted articles
 - [ ] add search functionality
-- [ ] create chatgpt.com?q=article link 
+- [x] create chatgpt.com?q=article link 
 - [ ] add uploaded file list page
+- [x] add article title and end article when a square mark encountered
+- [x] add Send to chatGPT button and its functionality
+- [x] add Copy to Clipboard button and its functionality
+- [x] add Back to article list button and its functionality
