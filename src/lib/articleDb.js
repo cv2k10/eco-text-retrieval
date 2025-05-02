@@ -7,33 +7,42 @@ import { getDb } from './db';
 export async function saveFileWithArticles(fileName, fileContent, articles) {
     try {
         const db = await getDb();
-        const insertFile = db.prepare(
-            'INSERT INTO files (name, content) VALUES (?, ?)'
-        );
         
-        const insertArticle = db.prepare(
-            'INSERT INTO articles (file_id, title, category, date, content) VALUES (?, ?, ?, ?, ?)'
-        );
-
-        // Use a transaction to ensure all operations succeed or fail together
-        const saveTransaction = db.transaction((fileName, fileContent, articles) => {
-            const fileInfo = insertFile.run(fileName, fileContent);
-            const fileId = fileInfo.lastInsertRowid;
+        // With sqlite3, we need to manually manage transactions
+        await db.run('BEGIN TRANSACTION');
+        
+        try {
+            // Insert file
+            const fileInfo = await db.run(
+                'INSERT INTO files (name, content) VALUES (?, ?)',
+                [fileName, fileContent]
+            );
+            
+            const fileId = fileInfo.lastID;
+            
+            // Insert articles
+            const insertArticle = db.prepare(
+                'INSERT INTO articles (file_id, title, category, date, content) VALUES (?, ?, ?, ?, ?)'
+            );
             
             for (const article of articles) {
-                insertArticle.run(
+                await insertArticle.run([
                     fileId,
                     article.title,
                     article.category,
                     article.date,
                     article.content
-                );
+                ]);
             }
             
+            // Commit transaction if all operations succeed
+            await db.run('COMMIT');
             return fileId;
-        });
-        
-        return saveTransaction(fileName, fileContent, articles);
+        } catch (err) {
+            // Roll back transaction if any operation fails
+            await db.run('ROLLBACK');
+            throw err;
+        }
     } catch (error) {
         console.error('Error saving file with articles:', error);
         throw error;
@@ -44,8 +53,7 @@ export async function saveFileWithArticles(fileName, fileContent, articles) {
 export async function getAllFiles() {
     try {
         const db = await getDb();
-        const query = db.prepare('SELECT id, name, created_at FROM files ORDER BY created_at DESC');
-        return query.all();
+        return await db.all('SELECT id, name, created_at FROM files ORDER BY created_at DESC');
     } catch (error) {
         console.error('Error fetching all files:', error);
         return [];
@@ -56,8 +64,7 @@ export async function getAllFiles() {
 export async function getFileById(fileId) {
     try {
         const db = await getDb();
-        const query = db.prepare('SELECT * FROM files WHERE id = ?');
-        return query.get(fileId);
+        return await db.get('SELECT * FROM files WHERE id = ?', [fileId]);
     } catch (error) {
         console.error('Error getting file by ID:', error);
         return null;
@@ -68,8 +75,7 @@ export async function getFileById(fileId) {
 export async function getArticlesByFileId(fileId) {
     try {
         const db = await getDb();
-        const query = db.prepare('SELECT * FROM articles WHERE file_id = ? ORDER BY id ASC');
-        return query.all(fileId);
+        return await db.all('SELECT * FROM articles WHERE file_id = ? ORDER BY id ASC', [fileId]);
     } catch (error) {
         console.error('Error getting articles by file ID:', error);
         return [];
@@ -80,13 +86,12 @@ export async function getArticlesByFileId(fileId) {
 export async function getAllArticles() {
     try {
         const db = await getDb();
-        const query = db.prepare(`
+        return await db.all(`
             SELECT articles.*, files.name as file_name 
             FROM articles 
             JOIN files ON articles.file_id = files.id 
             ORDER BY articles.created_at DESC
         `);
-        return query.all();
     } catch (error) {
         console.error('Error getting all articles:', error);
         return [];
@@ -97,8 +102,7 @@ export async function getAllArticles() {
 export async function getArticleById(articleId) {
     try {
         const db = await getDb();
-        const query = db.prepare('SELECT * FROM articles WHERE id = ?');
-        return query.get(articleId);
+        return await db.get('SELECT * FROM articles WHERE id = ?', [articleId]);
     } catch (error) {
         console.error('Error getting article by ID:', error);
         return null;
@@ -109,15 +113,14 @@ export async function getArticleById(articleId) {
 export async function searchArticles(searchTerm) {
     try {
         const db = await getDb();
-        const query = db.prepare(`
+        const searchPattern = `%${searchTerm}%`;
+        return await db.all(`
             SELECT articles.*, files.name as file_name 
             FROM articles 
             JOIN files ON articles.file_id = files.id 
             WHERE articles.title LIKE ? OR articles.content LIKE ?
             ORDER BY articles.created_at DESC
-        `);
-        const searchPattern = `%${searchTerm}%`;
-        return query.all(searchPattern, searchPattern);
+        `, [searchPattern, searchPattern]);
     } catch (error) {
         console.error('Error searching articles:', error);
         return [];
@@ -128,8 +131,7 @@ export async function searchArticles(searchTerm) {
 export async function deleteFile(fileId) {
     try {
         const db = await getDb();
-        const query = db.prepare('DELETE FROM files WHERE id = ?');
-        return query.run(fileId);
+        return await db.run('DELETE FROM files WHERE id = ?', [fileId]);
     } catch (error) {
         console.error('Error deleting file:', error);
         throw error;
@@ -148,12 +150,12 @@ export async function bookmarkArticle(articleId, notes = '') {
         }
         
         // Insert or replace bookmark (using the UNIQUE constraint)
-        const query = db.prepare(
-            'INSERT OR REPLACE INTO bookmarks (article_id, notes) VALUES (?, ?)'
+        const result = await db.run(
+            'INSERT OR REPLACE INTO bookmarks (article_id, notes) VALUES (?, ?)',
+            [articleId, notes]
         );
         
-        const result = query.run(articleId, notes);
-        return { success: true, id: result.lastInsertRowid };
+        return { success: true, id: result.lastID };
     } catch (error) {
         console.error('Error bookmarking article:', error);
         throw error;
@@ -164,8 +166,7 @@ export async function bookmarkArticle(articleId, notes = '') {
 export async function removeBookmark(articleId) {
     try {
         const db = await getDb();
-        const query = db.prepare('DELETE FROM bookmarks WHERE article_id = ?');
-        const result = query.run(articleId);
+        const result = await db.run('DELETE FROM bookmarks WHERE article_id = ?', [articleId]);
         
         return { 
             success: true, 
@@ -181,14 +182,12 @@ export async function removeBookmark(articleId) {
 export async function getBookmarkedArticles() {
     try {
         const db = await getDb();
-        const query = db.prepare(`
+        return await db.all(`
             SELECT articles.*, bookmarks.id as bookmark_id, bookmarks.notes, bookmarks.created_at as bookmarked_at
             FROM bookmarks
             JOIN articles ON bookmarks.article_id = articles.id
             ORDER BY bookmarks.created_at DESC
         `);
-        
-        return query.all();
     } catch (error) {
         console.error('Error fetching bookmarked articles:', error);
         return [];
@@ -199,8 +198,7 @@ export async function getBookmarkedArticles() {
 export async function isArticleBookmarked(articleId) {
     try {
         const db = await getDb();
-        const query = db.prepare('SELECT id FROM bookmarks WHERE article_id = ?');
-        const result = query.get(articleId);
+        const result = await db.get('SELECT id FROM bookmarks WHERE article_id = ?', [articleId]);
         
         return !!result;
     } catch (error) {
