@@ -135,3 +135,76 @@ export async function deleteFile(fileId) {
         throw error;
     }
 }
+
+// Bookmark an article
+export async function bookmarkArticle(articleId, notes = '') {
+    try {
+        const db = await getDb();
+        
+        // First check if article exists
+        const article = await getArticleById(articleId);
+        if (!article) {
+            throw new Error(`Article with ID ${articleId} not found`);
+        }
+        
+        // Insert or replace bookmark (using the UNIQUE constraint)
+        const query = db.prepare(
+            'INSERT OR REPLACE INTO bookmarks (article_id, notes) VALUES (?, ?)'
+        );
+        
+        const result = query.run(articleId, notes);
+        return { success: true, id: result.lastInsertRowid };
+    } catch (error) {
+        console.error('Error bookmarking article:', error);
+        throw error;
+    }
+}
+
+// Remove a bookmark
+export async function removeBookmark(articleId) {
+    try {
+        const db = await getDb();
+        const query = db.prepare('DELETE FROM bookmarks WHERE article_id = ?');
+        const result = query.run(articleId);
+        
+        return { 
+            success: true, 
+            removed: result.changes > 0 
+        };
+    } catch (error) {
+        console.error('Error removing bookmark:', error);
+        throw error;
+    }
+}
+
+// Get all bookmarked articles
+export async function getBookmarkedArticles() {
+    try {
+        const db = await getDb();
+        const query = db.prepare(`
+            SELECT articles.*, bookmarks.id as bookmark_id, bookmarks.notes, bookmarks.created_at as bookmarked_at
+            FROM bookmarks
+            JOIN articles ON bookmarks.article_id = articles.id
+            ORDER BY bookmarks.created_at DESC
+        `);
+        
+        return query.all();
+    } catch (error) {
+        console.error('Error fetching bookmarked articles:', error);
+        return [];
+    }
+}
+
+// Check if an article is bookmarked
+export async function isArticleBookmarked(articleId) {
+    try {
+        const db = await getDb();
+        const query = db.prepare('SELECT id FROM bookmarks WHERE article_id = ?');
+        const result = query.get(articleId);
+        
+        return !!result;
+    } catch (error) {
+        console.error('Error checking if article is bookmarked:', error);
+        return false;
+    }
+}

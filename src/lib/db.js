@@ -52,6 +52,15 @@ export async function getDb() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (file_id) REFERENCES files (id) ON DELETE CASCADE
       );
+      
+      CREATE TABLE IF NOT EXISTS bookmarks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        article_id INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        notes TEXT,
+        FOREIGN KEY (article_id) REFERENCES articles (id) ON DELETE CASCADE,
+        UNIQUE(article_id)
+      );
     `);
     
     console.log('Database initialized successfully');
