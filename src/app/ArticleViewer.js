@@ -9,10 +9,18 @@ const ArticleViewer = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [bookmarkedArticles, setBookmarkedArticles] = useState([]);
+    const [showBookmarksOnly, setShowBookmarksOnly] = useState(false);
+    const [currentFileId, setCurrentFileId] = useState(null);
 
     // Fetch files on component mount
     useEffect(() => {
         fetchFiles();
+    }, []);
+    
+    // Fetch bookmarks after component is mounted, but don't block UI on failure
+    useEffect(() => {
+        fetchBookmarkedArticles(false);
     }, []);
 
     const fetchFiles = async () => {
@@ -31,16 +39,93 @@ const ArticleViewer = () => {
 
     const fetchArticles = async (fileId) => {
         try {
+            setCurrentFileId(fileId);
             setLoading(true);
             const response = await fetch(`/api/articles?fileId=${fileId}`);
             if (!response.ok) throw new Error('Failed to fetch articles');
             const data = await response.json();
             setArticles(data);
             setSelectedArticle(null);
+            setShowBookmarksOnly(false);
             setLoading(false);
         } catch (error) {
             setError('Error fetching articles: ' + error.message);
             setLoading(false);
+        }
+    };
+    
+    const fetchBookmarkedArticles = async (showLoading = true) => {
+        try {
+            if (showLoading) setLoading(true);
+            const response = await fetch('/api/bookmarks');
+            if (!response.ok) throw new Error('Failed to fetch bookmarks');
+            const data = await response.json();
+            setBookmarkedArticles(data);
+            if (showLoading) setLoading(false);
+        } catch (error) {
+            console.error('Error fetching bookmarks:', error);
+            // Only set visible error if explicitly requested to show loading
+            if (showLoading) {
+                setError('Error fetching bookmarks: ' + error.message);
+                setLoading(false);
+            }
+            // Don't break the UI on initial load if bookmarks fail
+        }
+    };
+    
+    const toggleBookmark = async (articleId, event) => {
+        // Stop event from bubbling up to the parent button
+        if (event && event.stopPropagation) {
+            event.stopPropagation();
+        }
+        
+        try {
+            const isCurrentlyBookmarked = bookmarkedArticles.some(a => a.id === articleId);
+            
+            if (isCurrentlyBookmarked) {
+                // Remove bookmark
+                const response = await fetch(`/api/bookmarks?articleId=${articleId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (!response.ok) throw new Error('Failed to remove bookmark');
+                
+                // Update local state
+                setBookmarkedArticles(bookmarkedArticles.filter(a => a.id !== articleId));
+            } else {
+                // Add bookmark
+                const response = await fetch('/api/bookmarks', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ articleId }),
+                });
+                
+                if (!response.ok) throw new Error('Failed to add bookmark');
+                
+                // Refetch bookmarked articles to get full data
+                await fetchBookmarkedArticles();
+            }
+        } catch (error) {
+            setError('Error toggling bookmark: ' + error.message);
+        }
+    };
+    
+    const toggleBookmarksView = () => {
+        setShowBookmarksOnly(!showBookmarksOnly);
+        
+        if (!showBookmarksOnly) {
+            // Switching to bookmarks view
+            setArticles(bookmarkedArticles);
+        } else {
+            // If we were showing bookmarks and we have a file selected,
+            // reload that file's articles
+            if (currentFileId) {
+                fetchArticles(currentFileId);
+            } else {
+                setArticles([]);
+            }
         }
     };
 
@@ -223,6 +308,21 @@ const ArticleViewer = () => {
                     </button>
                 </div>
             </div>
+            
+            {/* Bookmarks toggle */}
+            <div className="flex justify-between items-center mb-4">
+                <button
+                    onClick={toggleBookmarksView}
+                    className={`px-4 py-2 rounded ${
+                        showBookmarksOnly 
+                            ? 'bg-yellow-500 text-white' 
+                            : 'bg-gray-200 text-gray-700'
+                    }`}
+                >
+                    {showBookmarksOnly ? 'Showing Bookmarks' : 'Show Bookmarks'} 
+                    ({bookmarkedArticles.length})
+                </button>
+            </div>
 
             {error && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -247,26 +347,35 @@ const ArticleViewer = () => {
                             &larr; Back to article list
                         </button>
 
-                        <button
-                            onClick={() => {
-                                navigator.clipboard.writeText(`${selectedArticle.title}\n\n${selectedArticle.content}`);
-                                alert('Article copied to clipboard!');
-                            }}
-                            className="bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded flex items-center"
-                        >
-                            Copy to Clipboard
-                        </button>
+                        <div className="flex items-center">
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(`${selectedArticle.title}\n\n${selectedArticle.content}`);
+                                    alert('Article copied to clipboard!');
+                                }}
+                                className="bg-blue-600 hover:bg-blue-700 text-white py-1 px-3 rounded flex items-center mr-2"
+                            >
+                                Copy to Clipboard
+                            </button>
 
-                        <button
-                            onClick={() => {
-                                const articleText = `${selectedArticle.title}\n\n${selectedArticle.content}`;
-                                const encodedText = encodeURIComponent(articleText);
-                                window.open(`https://chatgpt.com?q=${encodedText}`, '_blank');
-                            }}
-                            className="bg-green-600 hover:bg-green-700 text-white py-1 px-3 rounded flex items-center"
-                        >
-                            Send to ChatGPT
-                        </button>
+                            <button
+                                onClick={() => toggleBookmark(selectedArticle.id, { stopPropagation: () => {} })}
+                                className={`${bookmarkedArticles.some(a => a.id === selectedArticle.id) ? "bg-yellow-500 hover:bg-yellow-600" : "bg-gray-500 hover:bg-gray-600"} text-white py-1 px-3 rounded flex items-center mr-2`}
+                            >
+                                {bookmarkedArticles.some(a => a.id === selectedArticle.id) ? "★ Bookmarked" : "☆ Bookmark"}
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    const articleText = `${selectedArticle.title}\n\n${selectedArticle.content}`;
+                                    const encodedText = encodeURIComponent(articleText);
+                                    window.open(`https://chatgpt.com?q=${encodedText}`, '_blank');
+                                }}
+                                className="bg-green-600 hover:bg-green-700 text-white py-1 px-3 rounded flex items-center"
+                            >
+                                Send to ChatGPT
+                            </button>
+                        </div>
                     </div>
 
                     <div className="mb-4">
@@ -312,17 +421,30 @@ const ArticleViewer = () => {
                             <ul className="bg-white border rounded-lg divide-y">
                                 {articles.map((article, index) => (
                                     <li key={article.id || index} className="p-4 hover:bg-gray-50">
-                                        <button
-                                            onClick={() => viewArticle(article)}
-                                            className="w-full text-left"
-                                        >
-                                            <div className="font-medium text-blue-600 hover:underline">
-                                                {article.title}
-                                            </div>
-                                            <div className="text-sm text-gray-600 mt-1">
-                                                {article.category} | {article.date}
-                                            </div>
-                                        </button>
+                                        <div className="flex justify-between items-start w-full">
+                                            <button
+                                                onClick={() => viewArticle(article)}
+                                                className="text-left flex-grow"
+                                            >
+                                                <div className="font-medium text-blue-600 hover:underline">
+                                                    {article.title}
+                                                </div>
+                                                <div className="text-sm text-gray-600 mt-1">
+                                                    {article.category} | {article.date}
+                                                </div>
+                                            </button>
+                                            
+                                            <button
+                                                onClick={(e) => toggleBookmark(article.id, e)}
+                                                className="ml-2 px-2 text-yellow-500 hover:text-yellow-600 focus:outline-none text-xl"
+                                                title={bookmarkedArticles.some(a => a.id === article.id) ? "Remove bookmark" : "Add bookmark"}
+                                            >
+                                                {bookmarkedArticles.some(a => a.id === article.id) 
+                                                    ? "★" // Filled star
+                                                    : "☆" // Empty star
+                                                }
+                                            </button>
+                                        </div>
                                     </li>
                                 ))}
                             </ul>
